@@ -657,9 +657,9 @@ app.post('/v1/get-presigned-url', async (req, res) => {
       return res.status(404).json({ error: 'Session not found' });
     }
     
-    // Mock presigned URL - in production this would be from AWS S3
+    // Local storage upload URL
     const uploadUrl = `http://localhost:3000/upload/${sessionId}/${chunkId}`;
-    const s3Key = `sessions/${sessionId}/chunks/${chunkId}.wav`;
+    const localKey = `sessions/${sessionId}/chunks/${chunkId}.wav`;
     
     // Add chunk to session
     const chunkData = {
@@ -668,7 +668,7 @@ app.post('/v1/get-presigned-url', async (req, res) => {
       duration: 0, // Will be updated when chunk is uploaded
       fileSize: 0, // Will be updated when chunk is uploaded
       mimeType: 'audio/wav',
-      s3Key: s3Key,
+      fileKey: localKey,
       presignedUploadUrl: uploadUrl,
       presignedUrlExpires: new Date(Date.now() + 3600000), // 1 hour from now
       uploadStatus: 'pending'
@@ -705,7 +705,7 @@ app.put('/upload/:sessionId/:chunkId', async (req, res) => {
     chunk.uploadCompletedAt = new Date();
     chunk.fileSize = req.get('content-length') || 1024; // Mock file size
     chunk.duration = 10; // Mock duration
-    chunk.s3Url = `https://your-bucket.s3.amazonaws.com/${chunk.s3Key}`;
+    chunk.fileUrl = `http://localhost:3000/files/${chunk.fileKey}`;
     
     await session.save();
     
@@ -781,12 +781,12 @@ app.get('/api/v1/patients/:patientId/sessions', async (req, res) => {
         chunks: session.chunks.map(chunk => ({
           id: chunk.chunkId,
           sessionId: session._id.toString(),
-          localPath: chunk.s3Key,
+          localPath: chunk.fileKey,
           timestamp: chunk.createdAt.toISOString(),
           duration: chunk.duration,
           isUploaded: chunk.uploadStatus === 'completed',
           uploadUrl: chunk.presignedUploadUrl,
-          remoteUrl: chunk.s3Url
+          remoteUrl: chunk.fileUrl
         })),
         duration: session.duration,
         transcript: session.transcript

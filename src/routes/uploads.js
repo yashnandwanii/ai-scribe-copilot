@@ -4,7 +4,6 @@ const { authenticate, authorize } = require('../middleware/auth');
 const { validate, uploadValidation } = require('../utils/validation');
 const ResponseUtils = require('../utils/response');
 const logger = require('../utils/logger');
-const s3Service = require('../config/aws');
 const { asyncErrorHandler } = require('../middleware/errorHandler');
 
 const router = express.Router();

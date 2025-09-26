@@ -3,7 +3,6 @@ const { authenticate } = require('../middleware/auth');
 const ResponseUtils = require('../utils/response');
 const logger = require('../utils/logger');
 const mongoose = require('mongoose');
-const redis = require('../config/redis');
 const { asyncErrorHandler } = require('../middleware/errorHandler');
 
 const router = express.Router();
@@ -69,53 +68,9 @@ router.get('/detailed',
       };
     }
 
-    // Check Redis connectivity
-    try {
-      const redisStart = Date.now();
-      await redis.ping();
-      const redisInfo = await redis.info('server');
-      const redisVersion = redisInfo.match(/redis_version:([^\r\n]+)/)?.[1];
-      
-      healthStatus.checks.redis = {
-        status: 'healthy',
-        responseTime: Date.now() - redisStart,
-        version: redisVersion,
-        connection: 'connected'
-      };
-    } catch (error) {
-      healthStatus.status = 'unhealthy';
-      healthStatus.checks.redis = {
-        status: 'unhealthy',
-        error: error.message
-      };
-    }
+    // Redis removed - not using caching layer
 
-    // Check AWS S3 connectivity (optional)
-    if (process.env.AWS_ACCESS_KEY_ID) {
-      try {
-        const s3Service = require('../config/aws');
-        const s3Start = Date.now();
-        
-        // Try to list bucket contents (limit to 1 to minimize cost)
-        await s3Service.s3.listObjectsV2({
-          Bucket: process.env.AWS_S3_BUCKET,
-          MaxKeys: 1
-        }).promise();
-
-        healthStatus.checks.s3 = {
-          status: 'healthy',
-          responseTime: Date.now() - s3Start,
-          bucket: process.env.AWS_S3_BUCKET,
-          region: process.env.AWS_REGION
-        };
-      } catch (error) {
-        healthStatus.status = 'unhealthy';
-        healthStatus.checks.s3 = {
-          status: 'unhealthy',
-          error: error.message
-        };
-      }
-    }
+    // AWS S3 removed - using local file storage
 
     // System metrics
     const loadAverage = require('os').loadavg();
@@ -190,14 +145,7 @@ router.get('/readiness',
       checks.mongodb = 'not ready';
     }
 
-    // Check Redis
-    try {
-      await redis.ping();
-      checks.redis = 'ready';
-    } catch (error) {
-      isReady = false;
-      checks.redis = 'not ready';
-    }
+    // Redis removed - not using caching layer
 
     const statusCode = isReady ? 200 : 503;
     res.status(statusCode).json({
@@ -238,21 +186,7 @@ router.get('/metrics',
       // Get memory usage
       const memoryUsage = process.memoryUsage();
 
-      // Get Redis stats
-      let redisStats = {};
-      try {
-        const redisInfo = await redis.info('memory');
-        const usedMemory = redisInfo.match(/used_memory:(\d+)/)?.[1];
-        const maxMemory = redisInfo.match(/maxmemory:(\d+)/)?.[1];
-        
-        redisStats = {
-          usedMemory: parseInt(usedMemory) || 0,
-          maxMemory: parseInt(maxMemory) || 0,
-          connected: true
-        };
-      } catch (error) {
-        redisStats = { connected: false };
-      }
+      // Redis stats removed - not using caching layer
 
       const metrics = {
         timestamp: new Date().toISOString(),
@@ -275,7 +209,7 @@ router.get('/metrics',
           external: memoryUsage.external,
           arrayBuffers: memoryUsage.arrayBuffers
         },
-        redis: redisStats,
+
         system: {
           platform: process.platform,
           arch: process.arch,

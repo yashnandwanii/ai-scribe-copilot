@@ -5,7 +5,6 @@ const ResponseUtils = require('../utils/response');
 const logger = require('../utils/logger');
 const User = require('../models/User');
 const SecurityUtils = require('../utils/security');
-const redisClient = require('../config/redis');
 const { asyncErrorHandler } = require('../middleware/errorHandler');
 
 const router = express.Router();

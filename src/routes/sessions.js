@@ -324,14 +324,8 @@ router.post('/:id/chunks',
       return ResponseUtils.error(res, 'Chunk with this ID already exists', 409);
     }
 
-    // Generate S3 key
-    const s3Service = require('../config/aws');
-    const s3Key = s3Service.generateAudioKey(
-      session.doctorId.toString(),
-      session._id.toString(),
-      chunkId,
-      mimeType.split('/')[1]
-    );
+    // Generate local file key
+    const fileKey = `sessions/${session._id.toString()}/chunks/${chunkId}.${mimeType.split('/')[1]}`;
 
     const chunkData = {
       chunkId,
@@ -339,7 +333,7 @@ router.post('/:id/chunks',
       duration,
       fileSize,
       mimeType,
-      s3Key,
+      fileKey,
       uploadStatus: 'pending',
       metadata: {
         uploadedFrom: 'mobile',

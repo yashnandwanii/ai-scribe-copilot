@@ -202,12 +202,9 @@ const gracefulShutdown = (server) => {
       mongoose.connection.close(() => {
         logger.info('Database connection closed.');
         
-        // Close Redis connection
-        const redisClient = require('../config/redis');
-        redisClient.quit(() => {
-          logger.info('Redis connection closed.');
-          process.exit(0);
-        });
+        // Redis removed - direct process exit
+        logger.info('Graceful shutdown completed.');
+        process.exit(0);
       });
     });
 

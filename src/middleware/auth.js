@@ -3,7 +3,6 @@ const User = require('../models/User');
 const SecurityUtils = require('../utils/security');
 const ResponseUtils = require('../utils/response');
 const logger = require('../utils/logger');
-const redisClient = require('../config/redis');
 
 /**
  * JWT Authentication Middleware
