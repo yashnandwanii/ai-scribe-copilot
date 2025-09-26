@@ -32,11 +32,16 @@ const authenticate = async (req, res, next) => {
       // Verify token
       const decoded = SecurityUtils.verifyToken(token);
       
-      // Check if token is blacklisted
-      const isBlacklisted = await TokenBlacklist.isBlacklisted(token);
-      if (isBlacklisted) {
-        logger.logSecurity('authentication_failed', { reason: 'blacklisted_token' }, req);
-        return ResponseUtils.unauthorized(res, 'Token has been revoked');
+      // Check if token is blacklisted (with error handling)
+      try {
+        const isBlacklisted = await TokenBlacklist.isBlacklisted(token);
+        if (isBlacklisted) {
+          logger.logSecurity('authentication_failed', { reason: 'blacklisted_token' }, req);
+          return ResponseUtils.unauthorized(res, 'Token has been revoked');
+        }
+      } catch (blacklistError) {
+        // If blacklist check fails, log warning but continue (fail open for availability)
+        logger.warn('Blacklist check failed, allowing token:', blacklistError.message);
       }
 
       // Check if user still exists

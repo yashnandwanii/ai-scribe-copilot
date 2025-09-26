@@ -8,12 +8,15 @@ const path = require('path');
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
 // Import models with error handling
-let Patient, Session, User;
+let Patient, Session, User, TokenBlacklist, RefreshToken, RateLimit;
 try {
   Patient = require('./models/Patient');
   Session = require('./models/Session');
   User = require('./models/User');
-  console.log('✅ Models loaded successfully');
+  TokenBlacklist = require('./models/TokenBlacklist');
+  RefreshToken = require('./models/RefreshToken');
+  RateLimit = require('./models/RateLimit');
+  console.log('✅ All models loaded successfully');
 } catch (error) {
   console.log('⚠️ Models failed to load:', error.message);
   console.log('📄 Creating mock models for development...');
@@ -23,6 +26,9 @@ try {
   Patient = mongoose.model('Patient', mockSchema);
   Session = mongoose.model('Session', mockSchema);
   User = mongoose.model('User', mockSchema);
+  TokenBlacklist = mongoose.model('TokenBlacklist', mockSchema);
+  RefreshToken = mongoose.model('RefreshToken', mockSchema);
+  RateLimit = mongoose.model('RateLimit', mockSchema);
 }
 
 const app = express();

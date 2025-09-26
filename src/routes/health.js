@@ -296,10 +296,7 @@ router.get('/performance',
       await mongoose.connection.db.admin().ping();
       const dbTime = Number(process.hrtime.bigint() - dbStart) / 1000000; // Convert to milliseconds
 
-      // Redis performance test
-      const redisStart = process.hrtime.bigint();
-      await redis.ping();
-      const redisTime = Number(process.hrtime.bigint() - redisStart) / 1000000;
+      // Redis performance test removed - not using Redis
 
       // Memory allocation test
       const memStart = process.hrtime.bigint();
@@ -315,10 +312,7 @@ router.get('/performance',
             responseTime: dbTime,
             status: 'healthy'
           },
-          redis: {
-            responseTime: redisTime,
-            status: 'healthy'
-          },
+
           memory: {
             allocationTime: memTime,
             status: 'healthy'
@@ -332,9 +326,7 @@ router.get('/performance',
       if (dbTime > 100) {
         performance.recommendations.push('Database response time is high. Consider optimization.');
       }
-      if (redisTime > 50) {
-        performance.recommendations.push('Redis response time is high. Check connection.');
-      }
+      // Redis performance check removed - not using Redis
       if (process.memoryUsage().heapUsed > 500 * 1024 * 1024) {
         performance.recommendations.push('High memory usage detected. Consider optimization.');
       }
