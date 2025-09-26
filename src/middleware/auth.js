@@ -1,5 +1,7 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const TokenBlacklist = require('../models/TokenBlacklist');
+const RateLimit = require('../models/RateLimit');
 const SecurityUtils = require('../utils/security');
 const ResponseUtils = require('../utils/response');
 const logger = require('../utils/logger');
@@ -31,7 +33,7 @@ const authenticate = async (req, res, next) => {
       const decoded = SecurityUtils.verifyToken(token);
       
       // Check if token is blacklisted
-      const isBlacklisted = await redisClient.get(`blacklist:${token}`);
+      const isBlacklisted = await TokenBlacklist.isBlacklisted(token);
       if (isBlacklisted) {
         logger.logSecurity('authentication_failed', { reason: 'blacklisted_token' }, req);
         return ResponseUtils.unauthorized(res, 'Token has been revoked');
@@ -247,14 +249,10 @@ const authenticateApiKey = async (req, res, next) => {
       return ResponseUtils.unauthorized(res, 'API key required');
     }
 
-    // Check if API key exists and is valid
-    const hashedKey = SecurityUtils.hashData(apiKey);
-    const keyData = await redisClient.get(`api_key:${hashedKey}`);
-    
-    if (!keyData) {
-      logger.logSecurity('api_key_authentication_failed', { reason: 'invalid_key' }, req);
-      return ResponseUtils.unauthorized(res, 'Invalid API key');
-    }
+    // API key authentication temporarily disabled - using JWT tokens only
+    // TODO: Implement database-based API key storage if needed
+    logger.logSecurity('api_key_authentication_failed', { reason: 'api_key_disabled' }, req);
+    return ResponseUtils.unauthorized(res, 'API key authentication temporarily disabled');
 
     const { userId, permissions, expiresAt } = keyData;
 
@@ -295,21 +293,14 @@ const userRateLimit = (maxRequests = 1000, windowMs = 3600000) => {
     try {
       const userId = req.user._id.toString();
       const key = `user_rate_limit:${userId}`;
-      const currentTime = Date.now();
-      const windowStart = currentTime - windowMs;
-
-      // Get current request count
-      const requestCount = await redisClient.incr(key);
       
-      if (requestCount === 1) {
-        // Set expiration for the key
-        await redisClient.expire(key, Math.ceil(windowMs / 1000));
-      }
-
-      if (requestCount > maxRequests) {
+      // Use MongoDB-based rate limiting
+      const rateLimitResult = await RateLimit.incrementLimit(key, windowMs, maxRequests);
+      
+      if (rateLimitResult.exceeded) {
         logger.logSecurity('user_rate_limit_exceeded', {
           userId,
-          requestCount,
+          requestCount: rateLimitResult.count,
           limit: maxRequests,
         }, req);
         return ResponseUtils.tooManyRequests(res, 'User rate limit exceeded');

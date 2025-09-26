@@ -4,6 +4,8 @@ const { validate, userValidation } = require('../utils/validation');
 const ResponseUtils = require('../utils/response');
 const logger = require('../utils/logger');
 const User = require('../models/User');
+const RefreshToken = require('../models/RefreshToken');
+const TokenBlacklist = require('../models/TokenBlacklist');
 const SecurityUtils = require('../utils/security');
 const { asyncErrorHandler } = require('../middleware/errorHandler');
 
@@ -57,11 +59,16 @@ router.post('/register',
     const token = user.generateAuthToken();
     const refreshToken = user.generateRefreshToken();
 
-    // Store refresh token in Redis
-    await redisClient.setex(
-      `refresh_token:${user._id}`,
+    // Store refresh token in MongoDB
+    await RefreshToken.storeToken(
+      user._id,
+      refreshToken,
       30 * 24 * 60 * 60, // 30 days
-      refreshToken
+      {
+        userAgent: req.headers['user-agent'],
+        ipAddress: req.ip,
+        deviceType: 'registration'
+      }
     );
 
     // Log registration
@@ -109,11 +116,16 @@ router.post('/login',
       // Set token expiration based on rememberMe
       const tokenExpiry = rememberMe ? 30 * 24 * 60 * 60 : 7 * 24 * 60 * 60; // 30 days or 7 days
 
-      // Store refresh token in Redis
-      await redisClient.setex(
-        `refresh_token:${user._id}`,
+      // Store refresh token in MongoDB
+      await RefreshToken.storeToken(
+        user._id,
+        refreshToken,
         tokenExpiry,
-        refreshToken
+        {
+          userAgent: req.headers['user-agent'],
+          ipAddress: req.ip,
+          deviceType: rememberMe ? 'persistent' : 'session'
+        }
       );
 
       // Log successful login
@@ -167,9 +179,9 @@ router.post('/refresh',
       // Verify refresh token
       const decoded = SecurityUtils.verifyToken(refreshToken, true);
 
-      // Check if refresh token exists in Redis
-      const storedToken = await redisClient.get(`refresh_token:${decoded.userId}`);
-      if (!storedToken || storedToken !== refreshToken) {
+      // Check if refresh token exists in MongoDB
+      const tokenDoc = await RefreshToken.verifyToken(refreshToken);
+      if (!tokenDoc || tokenDoc.userId._id.toString() !== decoded.userId) {
         logger.logSecurity('invalid_refresh_token', { userId: decoded.userId }, req);
         return ResponseUtils.unauthorized(res, 'Invalid refresh token');
       }
@@ -184,15 +196,17 @@ router.post('/refresh',
       const newToken = user.generateAuthToken();
       const newRefreshToken = user.generateRefreshToken();
 
-      // Update refresh token in Redis
-      await redisClient.setex(
-        `refresh_token:${user._id}`,
+      // Update refresh token in MongoDB
+      await RefreshToken.storeToken(
+        user._id,
+        newRefreshToken,
         30 * 24 * 60 * 60, // 30 days
-        newRefreshToken
+        {
+          userAgent: req.headers['user-agent'],
+          ipAddress: req.ip,
+          deviceType: 'refresh'
+        }
       );
-
-      // Delete old refresh token
-      await redisClient.del(`refresh_token:${decoded.userId}`);
 
       logger.logAuth('token_refreshed', user._id);
 
@@ -222,14 +236,19 @@ router.post('/logout',
 
     // Add token to blacklist
     const decoded = SecurityUtils.verifyToken(token);
-    const expiryTime = decoded.exp * 1000 - Date.now();
+    const expiryTime = decoded.exp * 1000;
     
-    if (expiryTime > 0) {
-      await redisClient.setex(`blacklist:${token}`, Math.ceil(expiryTime / 1000), 'true');
+    if (expiryTime > Date.now()) {
+      await TokenBlacklist.blacklistToken(
+        token,
+        userId,
+        new Date(expiryTime),
+        'logout'
+      );
     }
 
     // Remove refresh token
-    await redisClient.del(`refresh_token:${userId}`);
+    await RefreshToken.deleteToken(userId);
 
     // Clear cookie
     res.clearCookie('token');
@@ -329,7 +348,7 @@ router.post('/change-password',
 
     // Invalidate all existing tokens by updating passwordChangedAt
     // Remove all refresh tokens for this user
-    await redisClient.del(`refresh_token:${user._id}`);
+    await RefreshToken.deleteToken(user._id);
 
     logger.logAuth('password_changed', user._id);
 
@@ -464,15 +483,20 @@ router.delete('/account',
     await user.save();
 
     // Remove all refresh tokens
-    await redisClient.del(`refresh_token:${user._id}`);
+    await RefreshToken.deleteToken(user._id);
 
     // Add current token to blacklist
     const token = req.token;
     const decoded = SecurityUtils.verifyToken(token);
-    const expiryTime = decoded.exp * 1000 - Date.now();
+    const expiryTime = decoded.exp * 1000;
     
-    if (expiryTime > 0) {
-      await redisClient.setex(`blacklist:${token}`, Math.ceil(expiryTime / 1000), 'true');
+    if (expiryTime > Date.now()) {
+      await TokenBlacklist.blacklistToken(
+        token,
+        user._id,
+        new Date(expiryTime),
+        'account_deactivation'
+      );
     }
 
     logger.logAuth('account_deleted', user._id);
