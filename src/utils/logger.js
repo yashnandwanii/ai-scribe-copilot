@@ -1,11 +1,15 @@
 const winston = require('winston');
 const path = require('path');
 
-// Create logs directory if it doesn't exist
+// Create logs directory if it doesn't exist (only for local development)
 const fs = require('fs');
 const logsDir = path.join(__dirname, '../../logs');
-if (!fs.existsSync(logsDir)) {
-  fs.mkdirSync(logsDir, { recursive: true });
+if (!process.env.VERCEL && !fs.existsSync(logsDir)) {
+  try {
+    fs.mkdirSync(logsDir, { recursive: true });
+  } catch (error) {
+    console.warn('Could not create logs directory:', error.message);
+  }
 }
 
 // Define log format
@@ -18,12 +22,20 @@ const logFormat = winston.format.combine(
   winston.format.prettyPrint()
 );
 
-// Create different log levels for different files
-const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'info',
-  format: logFormat,
-  defaultMeta: { service: 'medication-app-backend' },
-  transports: [
+// Create transports array (conditional file logging)
+const transports = [];
+
+// Always add console transport
+transports.push(new winston.transports.Console({
+  format: winston.format.combine(
+    winston.format.colorize(),
+    winston.format.simple()
+  )
+}));
+
+// Add file transports only for local development (not on Vercel)
+if (!process.env.VERCEL) {
+  transports.push(
     // Write all logs with importance level of 'error' or less to 'error.log'
     new winston.transports.File({
       filename: path.join(logsDir, 'error.log'),
@@ -45,25 +57,33 @@ const logger = winston.createLogger({
       level: 'warn',
       maxsize: 5242880, // 5MB
       maxFiles: 3,
-    }),
-  ],
+    })
+  );
+}
+
+// Create logger with dynamic transports
+const logger = winston.createLogger({
+  level: process.env.LOG_LEVEL || 'info',
+  format: logFormat,
+  defaultMeta: { service: 'medication-app-backend' },
+  transports: transports,
   
-  // Handle exceptions and rejections
-  exceptionHandlers: [
+  // Handle exceptions and rejections (conditional)
+  exceptionHandlers: !process.env.VERCEL ? [
     new winston.transports.File({
       filename: path.join(logsDir, 'exceptions.log'),
       maxsize: 5242880, // 5MB
       maxFiles: 3,
     })
-  ],
+  ] : [new winston.transports.Console()],
   
-  rejectionHandlers: [
+  rejectionHandlers: !process.env.VERCEL ? [
     new winston.transports.File({
       filename: path.join(logsDir, 'rejections.log'),
       maxsize: 5242880, // 5MB
       maxFiles: 3,
     })
-  ]
+  ] : [new winston.transports.Console()]
 });
 
 // Add console transport for development

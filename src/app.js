@@ -21,14 +21,14 @@ try {
   console.log('⚠️ Models failed to load:', error.message);
   console.log('📄 Creating mock models for development...');
   
-  // Create minimal mock models
+  // Create minimal mock models (check if already exists)
   const mockSchema = new mongoose.Schema({}, { strict: false });
-  Patient = mongoose.model('Patient', mockSchema);
-  Session = mongoose.model('Session', mockSchema);
-  User = mongoose.model('User', mockSchema);
-  TokenBlacklist = mongoose.model('TokenBlacklist', mockSchema);
-  RefreshToken = mongoose.model('RefreshToken', mockSchema);
-  RateLimit = mongoose.model('RateLimit', mockSchema);
+  Patient = mongoose.models.Patient || mongoose.model('Patient', mockSchema);
+  Session = mongoose.models.Session || mongoose.model('Session', mockSchema);
+  User = mongoose.models.User || mongoose.model('User', mockSchema);
+  TokenBlacklist = mongoose.models.TokenBlacklist || mongoose.model('TokenBlacklist', mockSchema);
+  RefreshToken = mongoose.models.RefreshToken || mongoose.model('RefreshToken', mockSchema);
+  RateLimit = mongoose.models.RateLimit || mongoose.model('RateLimit', mockSchema);
 }
 
 const app = express();
