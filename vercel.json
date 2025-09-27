@@ -1,0 +1,44 @@
+{
+  "version": 2,
+  "name": "ai-scribe-backend",
+  "builds": [
+    {
+      "src": "src/app.js",
+      "use": "@vercel/node",
+      "config": {
+        "maxLambdaSize": "50mb"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "src/app.js"
+    },
+    {
+      "src": "/health",
+      "dest": "src/app.js"
+    },
+    {
+      "src": "/upload/(.*)",
+      "dest": "src/app.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "src/app.js"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  },
+  "functions": {
+    "src/app.js": {
+      "maxDuration": 30
+    }
+  },
+  "regions": ["iad1"],
+  "outputDirectory": ".",
+  "installCommand": "npm install",
+  "buildCommand": "echo 'No build step required'",
+  "framework": null
+}

@@ -823,53 +823,62 @@ app.use('*', (req, res) => {
   });
 });
 
-// Start server
-const server = app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/health`);
-  console.log(`📋 API Endpoints available:`);
-  console.log(`   GET  /api/v1/patients`);
-  console.log(`   POST /api/v1/patients`);
-  console.log(`   GET  /api/v1/patients/stats/overview`);
-  console.log(`   GET  /api/v1/auth/me`);
-});
+// Start server (only for local development, not for Vercel)
+let server;
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  server = app.listen(PORT, () => {
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
+    console.log(`📊 Health check: http://localhost:${PORT}/health`);
+    console.log(`📋 API Endpoints available:`);
+    console.log(`   GET  /api/v1/patients`);
+    console.log(`   POST /api/v1/patients`);
+    console.log(`   GET  /api/v1/patients/stats/overview`);
+    console.log(`   GET  /api/v1/auth/me`);
+  });
+} else {
+  console.log('🔧 Running in Vercel serverless mode');
+}
 
-// Handle server errors
-server.on('error', (error) => {
-  console.error('❌ Server error:', error);
-  if (error.syscall !== 'listen') {
-    throw error;
-  }
-  
-  const bind = typeof PORT === 'string' ? 'Pipe ' + PORT : 'Port ' + PORT;
-  
-  switch (error.code) {
-    case 'EACCES':
-      console.error(bind + ' requires elevated privileges');
-      process.exit(1);
-      break;
-    case 'EADDRINUSE':
-      console.error(bind + ' is already in use');
-      process.exit(1);
-      break;
-    default:
+// Handle server errors (only if server exists)
+if (server) {
+  server.on('error', (error) => {
+    console.error('❌ Server error:', error);
+    if (error.syscall !== 'listen') {
       throw error;
-  }
-});
-
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('🛑 SIGTERM received, shutting down gracefully');
-  server.close(() => {
-    console.log('💤 Process terminated');
+    }
+    
+    const bind = typeof PORT === 'string' ? 'Pipe ' + PORT : 'Port ' + PORT;
+    
+    switch (error.code) {
+      case 'EACCES':
+        console.error(bind + ' requires elevated privileges');
+        process.exit(1);
+        break;
+      case 'EADDRINUSE':
+        console.error(bind + ' is already in use');
+        process.exit(1);
+        break;
+      default:
+        throw error;
+    }
   });
-});
+}
 
-process.on('SIGINT', () => {
-  console.log('🛑 SIGINT received, shutting down gracefully');
-  server.close(() => {
-    console.log('💤 Process terminated');
+// Graceful shutdown (only if server exists)
+if (server) {
+  process.on('SIGTERM', () => {
+    console.log('🛑 SIGTERM received, shutting down gracefully');
+    server.close(() => {
+      console.log('💤 Process terminated');
+    });
   });
-});
+
+  process.on('SIGINT', () => {
+    console.log('🛑 SIGINT received, shutting down gracefully');
+    server.close(() => {
+      console.log('💤 Process terminated');
+    });
+  });
+}
 
 module.exports = app;
