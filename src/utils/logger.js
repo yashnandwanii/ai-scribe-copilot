@@ -1,15 +1,24 @@
 const winston = require('winston');
 const path = require('path');
 
-// Create logs directory if it doesn't exist (only for local development)
-const fs = require('fs');
-const logsDir = path.join(__dirname, '../../logs');
-if (!process.env.VERCEL && !fs.existsSync(logsDir)) {
-  try {
-    fs.mkdirSync(logsDir, { recursive: true });
-  } catch (error) {
-    console.warn('Could not create logs directory:', error.message);
+// Initialize logger without file system operations for serverless compatibility
+let logsDir;
+let canWriteFiles = false;
+
+try {
+  const fs = require('fs');
+  logsDir = path.join(__dirname, '../../logs');
+  
+  // Only attempt file operations in non-serverless environments
+  if (!process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME && process.env.NODE_ENV !== 'production') {
+    if (!fs.existsSync(logsDir)) {
+      fs.mkdirSync(logsDir, { recursive: true });
+    }
+    canWriteFiles = true;
   }
+} catch (error) {
+  // Completely silent failure - serverless environments should use console only
+  canWriteFiles = false;
 }
 
 // Define log format
@@ -33,8 +42,8 @@ transports.push(new winston.transports.Console({
   )
 }));
 
-// Add file transports only for local development (not on Vercel)
-if (!process.env.VERCEL) {
+// Add file transports only if we can write files
+if (canWriteFiles) {
   transports.push(
     // Write all logs with importance level of 'error' or less to 'error.log'
     new winston.transports.File({
@@ -69,7 +78,7 @@ const logger = winston.createLogger({
   transports: transports,
   
   // Handle exceptions and rejections (conditional)
-  exceptionHandlers: !process.env.VERCEL ? [
+  exceptionHandlers: canWriteFiles ? [
     new winston.transports.File({
       filename: path.join(logsDir, 'exceptions.log'),
       maxsize: 5242880, // 5MB
@@ -77,7 +86,7 @@ const logger = winston.createLogger({
     })
   ] : [new winston.transports.Console()],
   
-  rejectionHandlers: !process.env.VERCEL ? [
+  rejectionHandlers: canWriteFiles ? [
     new winston.transports.File({
       filename: path.join(logsDir, 'rejections.log'),
       maxsize: 5242880, // 5MB

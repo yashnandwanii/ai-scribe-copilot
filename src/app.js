@@ -7,28 +7,40 @@ const path = require('path');
 // Load environment variables
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
-// Import models with error handling
+// Import models with error handling (prevent duplicate loading)
 let Patient, Session, User, TokenBlacklist, RefreshToken, RateLimit;
-try {
-  Patient = require('./models/Patient');
-  Session = require('./models/Session');
-  User = require('./models/User');
-  TokenBlacklist = require('./models/TokenBlacklist');
-  RefreshToken = require('./models/RefreshToken');
-  RateLimit = require('./models/RateLimit');
-  console.log('✅ All models loaded successfully');
-} catch (error) {
-  console.log('⚠️ Models failed to load:', error.message);
-  console.log('📄 Creating mock models for development...');
-  
-  // Create minimal mock models (check if already exists)
-  const mockSchema = new mongoose.Schema({}, { strict: false });
-  Patient = mongoose.models.Patient || mongoose.model('Patient', mockSchema);
-  Session = mongoose.models.Session || mongoose.model('Session', mockSchema);
-  User = mongoose.models.User || mongoose.model('User', mockSchema);
-  TokenBlacklist = mongoose.models.TokenBlacklist || mongoose.model('TokenBlacklist', mockSchema);
-  RefreshToken = mongoose.models.RefreshToken || mongoose.model('RefreshToken', mockSchema);
-  RateLimit = mongoose.models.RateLimit || mongoose.model('RateLimit', mockSchema);
+
+// Check if models are already loaded (for serverless function reuse)
+if (mongoose.models.Patient) {
+  Patient = mongoose.models.Patient;
+  Session = mongoose.models.Session;
+  User = mongoose.models.User;
+  TokenBlacklist = mongoose.models.TokenBlacklist;
+  RefreshToken = mongoose.models.RefreshToken;
+  RateLimit = mongoose.models.RateLimit;
+  console.log('✅ Models already loaded (serverless reuse)');
+} else {
+  try {
+    Patient = require('./models/Patient');
+    Session = require('./models/Session');
+    User = require('./models/User');
+    TokenBlacklist = require('./models/TokenBlacklist');
+    RefreshToken = require('./models/RefreshToken');
+    RateLimit = require('./models/RateLimit');
+    console.log('✅ All models loaded successfully');
+  } catch (error) {
+    console.log('⚠️ Models failed to load:', error.message);
+    console.log('📄 Creating mock models for development...');
+    
+    // Create minimal mock models (safe creation)
+    const mockSchema = new mongoose.Schema({}, { strict: false });
+    Patient = mongoose.models.Patient || mongoose.model('Patient', mockSchema);
+    Session = mongoose.models.Session || mongoose.model('Session', mockSchema);
+    User = mongoose.models.User || mongoose.model('User', mockSchema);
+    TokenBlacklist = mongoose.models.TokenBlacklist || mongoose.model('TokenBlacklist', mockSchema);
+    RefreshToken = mongoose.models.RefreshToken || mongoose.model('RefreshToken', mockSchema);
+    RateLimit = mongoose.models.RateLimit || mongoose.model('RateLimit', mockSchema);
+  }
 }
 
 const app = express();
