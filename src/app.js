@@ -20,27 +20,42 @@ if (mongoose.models.Patient) {
   RateLimit = mongoose.models.RateLimit;
   console.log('✅ Models already loaded (serverless reuse)');
 } else {
-  try {
-    Patient = require('./models/Patient');
-    Session = require('./models/Session');
-    User = require('./models/User');
-    TokenBlacklist = require('./models/TokenBlacklist');
-    RefreshToken = require('./models/RefreshToken');
-    RateLimit = require('./models/RateLimit');
-    console.log('✅ All models loaded successfully');
-  } catch (error) {
-    console.log('⚠️ Models failed to load:', error.message);
-    console.log('📄 Creating mock models for development...');
-    
-    // Create minimal mock models (safe creation)
+  function safeLoadModel(name, requirePath) {
+    if (mongoose.models && mongoose.models[name]) {
+      return mongoose.models[name];
+    }
+
+    try {
+      const loaded = require(requirePath);
+      if (loaded && loaded.modelName) {
+        return loaded;
+      }
+      if (loaded && loaded.prototype && loaded.prototype instanceof mongoose.Model) {
+        return loaded;
+      }
+    } catch (err) {
+      // Fall through to fallback logic below
+    }
+
+    try {
+      require(requirePath);
+      if (mongoose.models && mongoose.models[name]) return mongoose.models[name];
+    } catch (err) {
+      // Ignore error and fall back
+    }
+
     const mockSchema = new mongoose.Schema({}, { strict: false });
-    Patient = mongoose.models.Patient || mongoose.model('Patient', mockSchema);
-    Session = mongoose.models.Session || mongoose.model('Session', mockSchema);
-    User = mongoose.models.User || mongoose.model('User', mockSchema);
-    TokenBlacklist = mongoose.models.TokenBlacklist || mongoose.model('TokenBlacklist', mockSchema);
-    RefreshToken = mongoose.models.RefreshToken || mongoose.model('RefreshToken', mockSchema);
-    RateLimit = mongoose.models.RateLimit || mongoose.model('RateLimit', mockSchema);
+    return mongoose.models[name] || mongoose.model(name, mockSchema);
   }
+
+  Patient = safeLoadModel('Patient', './models/Patient');
+  Session = safeLoadModel('Session', './models/Session');
+  User = safeLoadModel('User', './models/User');
+  TokenBlacklist = safeLoadModel('TokenBlacklist', './models/TokenBlacklist');
+  RefreshToken = safeLoadModel('RefreshToken', './models/RefreshToken');
+  RateLimit = safeLoadModel('RateLimit', './models/RateLimit');
+
+  console.log('✅ Models loaded');
 }
 
 const app = express();
